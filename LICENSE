@@ -1,0 +1,99 @@
+HauntCue Source-Available License 1.0
+Copyright (c) 2026 Rick Scarlett. All rights reserved except as granted below.
+
+This is a custom source-available license. It is not GNU GPL, MIT, or an
+OSI-approved open-source license.
+
+1. Covered material
+
+"HauntCue" or the "Software" means HauntCue-authored source code, firmware,
+web-interface code and documentation supplied under this license, including
+modified versions of that material. Independently licensed dependencies,
+tools, media and other third-party material are excluded and keep their
+own licenses. This license grants only rights held by its licensor.
+
+"Corresponding Source" means the complete preferred editable form of the
+covered material you distribute, including your changes and the build and
+installation instructions needed to reproduce that version. Generated or
+minified output alone is not Corresponding Source.
+
+2. Permission to use and modify
+
+You may download, inspect, run, copy and modify the Software for your own
+use without charge. This includes operating your own props at paid events
+or commercial attractions, provided you are not selling, licensing or
+otherwise supplying copies of HauntCue or HauntCue-equipped products for
+payment as described in section 4. Private modifications need not be
+published.
+
+3. Free sharing and shared modifications
+
+You may distribute unmodified or modified copies without charging for the
+Software or a product containing it, subject to all of these conditions:
+
+(a) Keep this license and the applicable copyright and attribution notices.
+(b) Clearly identify your modifications and their dates; do not imply that
+    Rick Scarlett endorsed your version.
+(c) Distribute the covered Software and changes to it under this same
+    license, without additional restrictions on the rights granted here.
+(d) Supply the Corresponding Source with the copy, or provide a clear,
+    freely accessible link to the exact Corresponding Source and build
+    instructions. Maintain that access while you distribute the copy.
+(e) Preserve notices and satisfy the separate licenses of dependencies,
+    tools, media and other independently licensed components.
+
+This section does not grant a right to relicense the covered material
+under GPL, MIT or other terms that remove the commercial-permission rule.
+It does not require independently written, separate components to adopt
+this license merely because they are distributed beside the Software.
+
+4. Written permission required before sales
+
+You must obtain Rick Scarlett's explicit written permission BEFORE:
+
+(a) Selling, licensing for a fee, renting, or charging for access to copies
+    of the Software, whether source, firmware or modified versions; or
+(b) Selling or charging for controllers, kits, props or other products with
+    the Software preinstalled, bundled, or supplied as part of that sale.
+
+This includes charges presented as product or installation charges when
+copies of HauntCue are supplied as part of the paid offering. A genuinely
+optional donation for a freely available copy is not a sale, but a
+mandatory payment, required donation or purchase condition is a charge.
+
+Request commercial permission at rick.scarlett@gmail.com. Notification
+alone, silence, a donation or possession of a copy does not constitute
+permission. Written permission may specify the permitted product, scope
+and terms. It cannot grant rights belonging to other copyright holders
+or waive independently applicable third-party license obligations.
+
+5. Name and attribution
+
+Keep the HauntCue and Rick Scarlett copyright/attribution notices in the
+source and documentation you distribute. This license does not grant
+trademark rights or permission to suggest endorsement of a modified
+version or a commercial product.
+
+6. Ending permission
+
+The permissions in this license are conditioned on compliance with its
+terms and end for you if you violate them. To restore permission after a
+violation, contact Rick Scarlett. This does not cancel rights that other
+compliant recipients received under this license or rights they hold
+under independent third-party licenses.
+
+7. No warranty; limitation of liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED
+BY APPLICABLE LAW, THE AUTHORS AND COPYRIGHT HOLDERS ARE NOT LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS
+USE, WHETHER IN CONTRACT, TORT OR OTHERWISE.
+
+HauntCue is not a safety-rated control or emergency-stop system. You are
+responsible for evaluating and testing your hardware, wiring, mechanisms,
+power switching and operating environment.
+
+Rights not expressly granted are reserved. Applicable law may provide
+rights that this license cannot exclude.

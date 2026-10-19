@@ -1,0 +1,75 @@
+[
+  {
+    "chip": "esp32",
+    "name": "Classic ESP32-WROOM",
+    "outputs": 6,
+    "audioPlayers": 2,
+    "boards": [
+      "ESP32 DevKit / 30 or 38 pin",
+      "ESP32 MiniKit four-row",
+      "LOLIN D32"
+    ],
+    "status": "Bench boot tested",
+    "directory": "binary",
+    "bootOffset": 4096,
+    "maxAppBytes": 1310720,
+    "flashFrequency": "40m"
+  },
+  {
+    "chip": "esp32c3",
+    "name": "ESP32-C3",
+    "outputs": 4,
+    "audioPlayers": 1,
+    "boards": [
+      "C3 SuperMini",
+      "C3 DevKitM-1"
+    ],
+    "status": "Experimental: compiled, not hardware tested",
+    "directory": "binary/esp32c3",
+    "bootOffset": 0,
+    "maxAppBytes": 2097152,
+    "flashFrequency": "40m"
+  },
+  {
+    "chip": "esp32s3",
+    "name": "ESP32-S3",
+    "outputs": 6,
+    "audioPlayers": 2,
+    "boards": [
+      "S3 DevKitC-1 (USB + 4MB minimum)"
+    ],
+    "status": "Experimental: compiled, not hardware tested",
+    "directory": "binary/esp32s3",
+    "bootOffset": 0,
+    "maxAppBytes": 2097152,
+    "flashFrequency": "80m"
+  },
+  {
+    "chip": "esp32s2",
+    "name": "ESP32-S2",
+    "outputs": 6,
+    "audioPlayers": 1,
+    "boards": [
+      "S2 Saola-1 / DevKit (USB + 4MB minimum)"
+    ],
+    "status": "Experimental: compiled, not hardware tested",
+    "directory": "binary/esp32s2",
+    "bootOffset": 4096,
+    "maxAppBytes": 2097152,
+    "flashFrequency": "40m"
+  },
+  {
+    "chip": "esp32c6",
+    "name": "ESP32-C6",
+    "outputs": 6,
+    "audioPlayers": 1,
+    "boards": [
+      "C6 DevKitC-1 (USB + 4MB minimum)"
+    ],
+    "status": "Experimental: compiled, not hardware tested",
+    "directory": "binary/esp32c6",
+    "bootOffset": 0,
+    "maxAppBytes": 2097152,
+    "flashFrequency": "40m"
+  }
+]
