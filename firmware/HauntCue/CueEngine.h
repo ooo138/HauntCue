@@ -8,7 +8,9 @@
 namespace haunt {
 constexpr size_t MAX_OUTPUTS = 6;
 constexpr size_t MAX_SCENES = 4;
-constexpr size_t MAX_CUES = 32;
+constexpr size_t MAX_CUES = 128;
+constexpr size_t MAX_SERVO_MOVES = 32;
+constexpr size_t MAX_CONFIG_BYTES = 65536;
 constexpr uint32_t MAX_DURATION = 120000;
 struct Output { char name[25] = ""; int8_t pin = -1; bool activeHigh = true; uint32_t maxOnMs = 0; };
 struct Cue { uint8_t output = 0; uint32_t start = 0, duration = 1000; };
@@ -18,13 +20,14 @@ struct Scene {
   char name[33] = "";
   uint32_t duration = 10000;
   uint16_t scareTrack = 2;
+  uint16_t enabledMask = 2047;
   uint8_t count = 0;
   Cue cues[MAX_CUES];
   uint8_t audioCount=0;AudioCue audioCues[8];
   uint8_t lightCount=0;LightCue lightCues[16];
   bool randomServo=false;
   uint8_t servoCount = 0;
-  ServoMove servoMoves[MAX_CUES];
+  ServoMove servoMoves[MAX_SERVO_MOVES];
 };
 struct Config {
   StormConfig storm=[] {StormConfig s;s.pin=BOARD_LIGHT1;return s;}();
@@ -103,7 +106,7 @@ inline const char* validate(const Config& c) {
     for(unsigned i=0;i<scene.audioCount;i++){const auto& q=scene.audioCues[i];if(q.start>=scene.duration||q.player>1||q.action>2||(q.action==0&&(!q.value||q.value>2999))||(q.action==1&&q.value>30)||(q.action==2&&q.value!=0))return "Invalid audio cue.";for(unsigned j=0;j<i;j++){const auto& z=scene.audioCues[j];uint32_t gap=q.start>z.start?q.start-z.start:z.start-q.start;if(q.player==z.player&&gap<500)return "Audio cues on one player need 500ms separation.";}}
     if(scene.lightCount>16)return "Use at most 16 lighting cues.";
     for(unsigned i=0;i<scene.lightCount;i++){const auto& q=scene.lightCues[i];if(q.channel>1||!q.duration||q.start>=scene.duration||q.duration>scene.duration-q.start)return "Lighting cue must fit scene.";for(unsigned j=0;j<i;j++){const auto& z=scene.lightCues[j];if(q.channel==z.channel&&q.start<z.start+z.duration&&z.start<q.start+q.duration)return "Lighting cues cannot overlap on one channel.";}}
-    if (scene.servoCount > MAX_CUES) return "Use at most 32 servo moves per scene.";
+    if (scene.servoCount > MAX_SERVO_MOVES) return "Use at most 32 servo moves per scene.";
     for (size_t i=0;i<scene.servoCount;++i) {
       const ServoMove& m=scene.servoMoves[i];
       if (!m.duration || m.start >= scene.duration || m.duration > scene.duration-m.start || m.angle < c.servoMinAngle || m.angle > c.servoMaxAngle) return "Servo movements must fit the scene and travel limits.";
@@ -148,10 +151,10 @@ private:uint8_t done=0;
 // No networking, delays, allocations, or Arduino dependencies in the scheduler.
 class Engine {
 public:
-  bool armed = false, running = false, idle=false;
+  bool armed = false, running = false, idle=false, previewing=false;
   uint32_t runCount = 0;
   void configure(const Config* next, uint32_t now, bool raw) {
-    cfg = next; armed = running = idle = testing = cooling = repeating = false;activeIndex=cfg->selected;lastScene=255;quietAt=now;serial=0;
+    cfg = next; armed = running = idle = testing = cooling = repeating = previewing = false;activeIndex=cfg->selected;lastScene=255;quietAt=now;serial=0;
     candidate = stable = raw; changedAt = now; releaseSeen = raw != cfg->triggerHigh;
   }
   void arm(bool value, uint32_t now, bool raw) {
@@ -166,8 +169,12 @@ public:
   }
   void stop(uint32_t now) {
     const bool hadRun = running;
-    running = idle = testing = repeating = false;quietAt=now;
+    running = idle = testing = repeating = previewing = false;quietAt=now;
     if (hadRun) { finishedAt = now; cooling = true; }
+  }
+  bool preview(uint8_t index,uint32_t now) {
+    if(armed||running||testing||index>=cfg->sceneCount)return false;
+    activeIndex=index;idle=false;running=true;previewing=true;repeating=false;startedAt=now;++serial;return true;
   }
   bool test(uint8_t index, uint32_t now) {
     if (armed || running || testing || index >= cfg->outputCount) return false;
@@ -199,7 +206,7 @@ public:
     // Overlapping cues on a channel merge; one ending cannot cancel another.
     for (size_t i = 0; i < scene.count; ++i) {
       const Cue& cue = scene.cues[i];
-      if (cue.output == index && t >= cue.start && t - cue.start < cue.duration) return true;
+      if ((scene.enabledMask & (1u<<index)) && cue.output == index && t >= cue.start && t - cue.start < cue.duration) return true;
     }
     return false;
   }

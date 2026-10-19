@@ -8,7 +8,9 @@ Build timed scares, ambient animations, sound cues, servo movements and lighting
 
 [Repository](https://github.com/ooo138/HauntCue) · [Downloads / Releases](https://github.com/ooo138/HauntCue/releases) · [Report an issue](https://github.com/ooo138/HauntCue/issues)
 
-**Current release: 1.32.0.** Classic ESP32-WROOM has been flashed and boot-tested. C3, S2, S3 and C6 builds are experimental and compile-checked; actual boards and connected loads need testing.
+**Development source: 1.33.0. Latest published installer: 1.32.0.** Version 1.33 adds Wi-Fi updates, a physical arm input, channel checkboxes, grouped cue editing, precise validation and 128 output cues. Its classic ESP32 application and PC logic/settings checks pass; the physical upgrade is being verified.
+
+**Published baseline: 1.32.0.** Classic ESP32-WROOM has been flashed and boot-tested. C3, S2, S3 and C6 builds are experimental and compile-checked; actual boards and connected loads need testing.
 
 ## Install and make your first prop
 
@@ -24,9 +26,12 @@ Build timed scares, ambient animations, sound cues, servo movements and lighting
 
 ## What you can build
 
-- **Sequences:** four scenes, up to 32 GPIO cues per scene, and scenes up to 120 seconds. Drag, resize and move cues between channels; edit exact times and use Undo/Redo.
+- **Sequences:** four scenes, up to 128 GPIO cues per scene (1.33), and scenes up to 120 seconds. Drag, resize and move cues between channels; edit exact times and use Undo/Redo. Select GPIO cue groups to copy, paste, duplicate, delete or nudge across times, channels and scenes.
 - **Scare and ambient timelines:** separate editing tabs; browsing a scene does not change the triggered scare. Explicitly assign the scare you want to run.
 - **Prop outputs:** up to six named switching outputs, configurable GPIO/polarity, pulse limits and one protected direction pair for a motor or pneumatic valve arrangement.
+- **Channel selection:** per-scene enable checkboxes plus a disarmed, one-shot test of the viewed scene’s checked channels. These choices also apply to normal playback until changed and saved.
+- **Physical arm input:** an optional, separate GPIO-to-ground button or maintained switch, with debounce and held-at-boot protection. Existing controllers start with this input disabled.
+- **Wi-Fi updates:** authenticated application-only uploads on layouts with two application slots. Saved prop data, NVS, network settings and passwords remain in place; the update page checks chip family, file size and SHA-256.
 - **Triggers:** a digital sensor/contact, manual fire, or a fixed/random repeat timer, with debounce and cooldown.
 - **Servo:** one extra hobby-servo channel, travel calibration, live control, recorded movements, motion presets and timeline cues.
 - **Lighting:** two prop-lighting channels, each supporting two-wire PWM through a suitable MOSFET or WS2812B pixels, with separate ambient/event profiles and multiple effects.
@@ -57,6 +62,7 @@ The optional status strip needs another free GPIO and LED-driver resource. Small
 GPIOs are **3.3V control signals**. Use appropriate relay, MOSFET, motor or valve drivers and separate supplies for loads; never connect 12V directly to a GPIO. Match your actual carrier’s labels and driver polarity. Software interlocks and the physical-stop input are not safety-rated power isolation or measured position feedback. Use appropriate independent power/pressure controls for your prop and test with loads disconnected first.
 
 - [General wiring](WIRING.md) · [Board wiring visuals](BOARD-WIRING-VISUALS.html)
+- [Physical arm button](ARM-INPUT.md) · [Wi-Fi updates and preserving settings](UPDATING.md)
 - [Physical stop button](PHYSICAL-STOP.md) · [Status-strip wiring](STATUS-LEDS.md)
 - [Lighting](LIGHTNING-WIRING.md) · [Pneumatic valves](PNEUMATICS-WIRING.md)
 - [DFPlayer audio loading](DFPLAYER-AUDIO.md) · [DY-SV8F audio and DIP switches](DY-SV8F-AUDIO.md)
@@ -65,7 +71,7 @@ GPIOs are **3.3V control signals**. Use appropriate relay, MOSFET, motor or valv
 
 Audio playback has serial/module latency; timing is not sample-accurate. The preview displays commanded states, not measurements from motors or lights. Overlapping ON/OFF cues on one output merge; leave gaps for distinct pulses. A reported software stop does not confirm that a relay or mechanism physically stopped.
 
-**Known lighting validation detail:** Ambient/Event cycle must be **100–10,000 ms**. Disabled lighting channels are still validated. Lightning flash duration is a different field. The current generic lighting error may require checking both channels.
+**Known lighting validation detail:** Ambient/Event cycle must be **100–10,000 ms**. Disabled lighting channels are still validated. Lightning flash duration is a different field. Version 1.33 reports the exact numeric field and range, with a Show setting shortcut; it retains the draft rather than silently changing values.
 
 ## Build from source
 
@@ -75,13 +81,16 @@ For classic ESP32-WROOM:
 
 1. Open `firmware/HauntCue/HauntCue.ino` in Arduino IDE. Keep its sibling headers in the same directory.
 2. Select **ESP32 Dev Module**, **4 MB flash**, and **Default 4MB with spiffs** partitions. HauntCue uses LittleFS in the data partition.
-3. Select the board’s actual serial port, then compile/upload with prop loads disconnected.
+3. The 1.33 classic build needs the size-optimized build described in [UPDATING.md](UPDATING.md#building-the-classic-application). The generated header alone does not guarantee that an unoptimized Arduino IDE build fits the default OTA slot. Keep the existing partition layout when updating a configured controller.
 
 The generated `WebUI.h` is included. After editing `web/index.html`, regenerate it from the repository root:
 
 ```shell
+npm install
 python build_web.py
 ```
+
+Regeneration requires Node.js 18 or newer. Terser is a pinned build-only dependency: it compresses the embedded JavaScript before gzip so the application fits the existing flash layout. No JavaScript packages run on the ESP32 or load from a CDN. The readable interface source remains in `web/index.html`.
 
 Experimental targets select the corresponding ESP32-C3/S2/S3/C6 development-module board. The supplied experimental release images use the partition layout in `partitions/experimental-4mb.csv`; for an equivalent sketch build, copy it to `firmware/HauntCue/partitions.csv` for that build. Remove that copy before returning to the classic/default layout. Export settings before changing layouts. Experimental hardware still needs validation.
 
@@ -105,6 +114,7 @@ node tests/emergency_test.cjs
 node tests/physical_stop_test.cjs
 node tests/scene_tabs_test.cjs
 node tests/status_led_test.cjs
+node tests/sequence_tools_test.cjs
 ```
 
 Additional C++ engine tests are in `tests/`. Browser/source tests and successful builds do not verify electrical wiring, physical stop latency or connected hardware.
