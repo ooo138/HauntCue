@@ -8,7 +8,7 @@ Build timed scares, ambient animations, sound cues, servo movements and lighting
 
 [Repository](https://github.com/ooo138/HauntCue) · [Downloads / Releases](https://github.com/ooo138/HauntCue/releases) · [Report an issue](https://github.com/ooo138/HauntCue/issues)
 
-**Development source: 1.33.0. Latest published installer: 1.32.0.** Version 1.33 adds Wi-Fi updates, a physical arm input, channel checkboxes, grouped cue editing, precise validation and 128 output cues. Its classic ESP32 application and PC logic/settings checks pass; the physical upgrade is being verified.
+**Development source: 1.33.0. Latest published installer: 1.32.0.** Version 1.33 adds Wi-Fi updates, a physical arm input, channel checkboxes, grouped cue editing, precise validation and 128 output cues. Its classic ESP32 application has passed software checks, USB boot verification, saved-settings comparisons and an actual Wi-Fi self-update. See [validation notes](VALIDATION-v1.33.md).
 
 **Published baseline: 1.32.0.** Classic ESP32-WROOM has been flashed and boot-tested. C3, S2, S3 and C6 builds are experimental and compile-checked; actual boards and connected loads need testing.
 

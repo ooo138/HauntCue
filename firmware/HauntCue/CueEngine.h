@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <initializer_list>
+#include <new>
 #include "StormEngine.h"
 #include "BoardProfile.h"
 
@@ -56,6 +57,9 @@ struct Config {
   uint16_t servoMinUs = 1000, servoMaxUs = 2000;
   uint8_t servoMinAngle = 20, servoMaxAngle = 160, servoHome = 90;
 };
+// Initialize directly in the destination: Config is larger than the Arduino
+// task stack at 128 cues. Assignment from Config{} creates an unsafe temporary.
+inline void resetConfig(Config& config){config.~Config();::new(static_cast<void*>(&config)) Config{};}
 inline bool outputPin(int p){return boardOutputPin(p);}
 inline bool inputPin(int p){return boardInputPin(p);}
 inline const char* validate(const Config& c) {

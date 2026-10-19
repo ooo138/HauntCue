@@ -75,6 +75,7 @@ try:
     diagnostic=subprocess.run(diagnostic_command,capture_output=True,text=True)
     (build/'link-driver.txt').write_text(diagnostic.stdout+'\n'+diagnostic.stderr)
     run(args);print('LINKED '+str(elf),flush=True)
+    print(run([sys.executable,root/'tools/check_stack_frames.py',elf]))
     print(run([tool/(prefix+'-size.exe'),elf]))
     converter=[options.esptool] if options.esptool else [sys.executable,'-m','esptool']
     image=build/'HauntCue.bin'

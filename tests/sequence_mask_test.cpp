@@ -4,6 +4,7 @@
 #include "../firmware/HauntCue/ArmInput.h"
 using namespace haunt;
 int main(){
+ Config reset;reset.outputCount=1;reset.scenes[0].enabledMask=0;reset.scenes[0].count=128;resetConfig(reset);assert(reset.outputCount==BOARD_OUTPUTS&&reset.scenes[0].enabledMask==2047&&reset.scenes[0].count==0);
  Config c;c.triggerEnabled=false;c.outputCount=2;c.outputs[0].pin=25;c.outputs[1].pin=26;c.triggerPin=32;c.sceneCount=2;c.scenes[0].duration=1000;c.scenes[1].duration=2000;
  for(unsigned i=0;i<128;i++)c.scenes[1].cues[i]={uint8_t(i%2),i*10,5};c.scenes[1].count=128;c.scenes[1].enabledMask=2;
  assert(!validate(c));Engine e;e.configure(&c,0,true);assert(e.preview(1,100));assert(!e.armed&&e.running&&e.previewing);assert(c.selected==0);assert(!e.on(0,100));assert(e.on(1,110));assert(!e.on(1,115));assert(e.on(1,1370));e.tick(2100,true);assert(!e.running&&!e.previewing&&!e.armed);assert(!e.on(0,2100)&&!e.on(1,2100));

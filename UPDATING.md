@@ -27,6 +27,8 @@ Install Node.js 18+, run npm install in the source folder, and regenerate WebUI.
 
 Software checks do not replace a disarmed boot test and verification against the controller’s saved backup.
 
+The build also checks linked Xtensa stack frames. Configuration defaults and decoding initialize their destination directly, avoiding a temporary configuration larger than the Arduino task stack. A stack-budget failure stops the build before an update can proceed.
+
 Example build commands after installing the pinned ESP32 core and ArduinoJson library:
 
 ```shell

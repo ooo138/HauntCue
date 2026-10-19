@@ -260,7 +260,7 @@ void setupPins() {
 
 void defaults() {
 
-  config = Config{};
+  resetConfig(config);
 
   const auto& pins=BOARD_PINS;
 
@@ -379,7 +379,7 @@ const char* decodeConfig(JsonVariantConst root, Config& c) {
 
   if(!au["player"].isNull() && au["player"]!="dfplayer" && au["player"]!="dy")return "Unknown audio player.";
 
-  c = Config{}; c.outputCount = outs.size(); c.sceneCount = scenes.size(); c.selected = root["selected"]; c.storm.channel=min<uint8_t>(5,c.outputCount-1); c.storm2.channel=min<uint8_t>(4,c.outputCount-1);
+  resetConfig(c); c.outputCount = outs.size(); c.sceneCount = scenes.size(); c.selected = root["selected"]; c.storm.channel=min<uint8_t>(5,c.outputCount-1); c.storm2.channel=min<uint8_t>(4,c.outputCount-1);
 
   if (!root["storm"].isNull()) {
 
