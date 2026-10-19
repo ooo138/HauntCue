@@ -1,0 +1,13 @@
+#include "../firmware/HauntCue/CueEngine.h"
+#include <cassert>
+#include <cstdio>
+using namespace haunt;
+Config make(){Config c;c.sceneCount=3;c.selected=0;c.idleScene=2;c.idleGap=1000;c.cooldown=500;c.debounce=40;int pins[]={25,26,27,18,19,23};for(int i=0;i<6;i++)c.outputs[i].pin=pins[i];for(int i=0;i<3;i++){c.scenes[i].duration=1000;c.scenes[i].count=1;c.scenes[i].cues[0]={uint8_t(i),0,200};}return c;}
+int main(){Config c=make();assert(!validate(c));Engine e;e.configure(&c,0,true);e.arm(true,0,true);e.tick(999,true);assert(!e.idle);e.tick(1000,true);assert(e.idle&&!e.running&&e.sceneIndex()==2&&e.runCount==0&&e.on(2,1000));e.tick(1050,false);e.tick(1090,false);assert(!e.idle&&e.running&&e.sceneIndex()==0&&e.runCount==1);assert(!e.on(2,1090));e.tick(2090,false);assert(!e.running&&!e.idle);e.tick(3090,false);assert(e.idle&&e.runCount==1);e.arm(false,3100,false);assert(!e.on(2,3100)&&!e.idle);e.tick(6000,false);assert(!e.idle);
+ c.randomScenes=true;e.configure(&c,0,true);e.arm(true,0,true);assert(e.start(0,1)&&e.sceneIndex()==1);e.tick(1000,true);assert(e.start(1500,1)&&e.sceneIndex()==0);e.tick(2500,true);assert(e.start(3000,0)&&e.sceneIndex()==1);assert(e.sceneIndex()!=2);
+ c.selected=2;assert(validate(c));c=make();c.scenes[0].audioCount=2;c.scenes[0].audioCues[0]={0,1,0,2};c.scenes[0].audioCues[1]={500,1,1,10};assert(!validate(c));c.scenes[0].audioCues[1].start=499;assert(validate(c));c.scenes[0].audioCues[1]={500,1,2,1};assert(validate(c));c.scenes[0].audioCues[1]={500,1,2,0};assert(!validate(c));
+ Scene s;s.servoCount=1;s.servoMoves[0]={0,1000,150,true};assert(servoAngle(s,250,50)==65);assert(servoAngle(s,500,50)==100);assert(servoAngle(s,1000,50)==150);s.servoMoves[0].ease=false;assert(servoAngle(s,250,50)==75);
+ c=make();e.configure(&c,0xffffff00u,true);e.arm(true,0xffffff00u,true);e.tick(uint32_t(0xffffff00u+1000),true);assert(e.idle);e.tick(uint32_t(0xffffff00u+2000),true);assert(!e.idle);e.tick(uint32_t(0xffffff00u+3000),true);assert(e.idle);
+ Scene audio;audio.audioCount=3;audio.audioCues[0]={1000,0,0,3};audio.audioCues[1]={0,0,0,1};audio.audioCues[2]={500,0,1,20};AudioCueClock clock;int calls=0;clock.tick(audio,1000,[&](const AudioCue& q){assert(q.start==uint32_t(calls*500));calls++;return true;});assert(calls==3);clock.tick(audio,2000,[&](const AudioCue&){calls++;return true;});assert(calls==3);clock.reset();clock.tick(audio,1000,[](const AudioCue&){return false;});calls=0;clock.tick(audio,1000,[&](const AudioCue&){calls++;return true;});assert(calls==3);
+ puts("PASS: idle wait, trigger preemption, resume, disarm, random exclusions/no repeats, audio bounds, easing and rollover");
+}
