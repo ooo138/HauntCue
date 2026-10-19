@@ -1,0 +1,65 @@
+# Compiled firmware and installer payloads belong in GitHub Releases.
+/binary/
+*.bin
+*.elf
+*.hex
+*.map
+*.o
+*.a
+*.exe
+*.dll
+*.zip
+*.tar.gz
+
+# Local SDKs, tools, build output and scratch work.
+/BoardData/
+/ArduinoIDE/
+/Sketches/
+/work/
+/build/
+/dist/
+/tmp/
+.pio/
+node_modules/
+__pycache__/
+*.py[cod]
+
+# Device backups, live configuration and credentials. Keep example files separate.
+/backups/
+/device-configs/
+/private/
+config.json
+config.bak
+config.tmp
+network.json
+credentials.json
+secrets.*
+.env
+.env.*
+!.env.example
+
+# Audio libraries/reference tracks can have separate rights or private content.
+*.mp3
+*.wav
+*.ogg
+*.flac
+*.m4a
+
+# Logs and machine-specific files.
+*.log
+boot-log.txt
+flash-log.txt
+web-tests-log.txt
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# firmware/HauntCue/WebUI.h is intentionally tracked so Arduino IDE builds
+# have the embedded interface without requiring Python first.
+
+# Temporary sketch-local partition override; canonical layouts are in partitions/.
+/firmware/HauntCue/partitions.csv

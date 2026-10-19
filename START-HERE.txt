@@ -1,0 +1,56 @@
+HauntCue - ESP32 Halloween prop controller
+
+EASY WINDOWS x64 INSTALL (no Arduino IDE or Python needed)
+1. Extract the WHOLE ZIP to a folder. Do not run the installer inside the ZIP.
+2. Plug in a supported ESP32 / C3 / S2 / S3 / C6 board with at least 4MB flash using a USB DATA cable.
+   Leave all prop loads unplugged. The installer detects the family. ESP8266/H2/P4/C5 are not included.
+3. Double-click INSTALL-START-HERE.cmd. Choose the ESP32's COM port.
+   Unplug/replug to see which port disappears if there are multiple ports.
+4. Choose 1 to install/update and retain settings, or 2 for a fresh installation.
+   Fresh installation erases saved settings on that ESP32; it asks you to type ERASE.
+   Type INSTALL to begin. Wait for UPLOAD VERIFIED before unplugging.
+5. On your phone/PC, join Wi-Fi HauntCue-XXXXXX.
+   Fresh-board Wi-Fi password: hauntcue123
+6. Open http://192.168.4.1 (type it into the browser address bar).
+   Login: admin / hauntcue123 for a fresh installation.
+7. Follow the four-step setup wizard. Choose a controller name, prop/audio option,
+   and optional home Wi-Fi. Review your choices, confirm USB-only and finish.
+   You can reopen it under Features & help > Run setup wizard.
+8. Review Pins & trigger and Sound before attaching prop hardware.
+   The default GPIO table is NOT a voltage/power driver. Use compatible drivers.
+   New and updated boards boot disarmed.
+
+IF THERE IS NO COM PORT:
+Use a data cable (some USB cables only charge). Install the USB serial driver
+from your ESP board/USB-chip manufacturer, then unplug/replug.
+Your USB chip may be CP210x, CH340, or another model; use its matching driver.
+
+IF THE UPLOAD CANNOT CONNECT:
+Close serial monitors. Hold the board's BOOT button while connection dots appear;
+release once it connects. Try a shorter USB cable or another USB socket.
+
+A Windows download/security prompt may appear for the bundled executable/script.
+Use the official vendor/tool source and your normal Windows trust policy; this
+installer does not disable Defender, SmartScreen or change system execution policy.
+ExecutionPolicy Bypass applies only to this installer PowerShell process.
+
+AUDIO:
+Read DY-SV8F-AUDIO.md. Extract HauntCue-audio-starter.zip separately, or use
+files in audio-starter/. Copy only the WAV files to the DY USB drive, in order.
+Serial control does not transfer sound files. Change DIP switches with power off.
+
+The installer bundles Espressif esptool v5.3.1 plus its license and source archive.
+Source: https://github.com/espressif/esptool/tree/v5.3.1
+Firmware source, verification notes and wiring diagrams are included.
+
+Official CP210x driver page (for CP210x USB chips):
+https://www.silabs.com/software-and-tools/usb-to-uart-bridge-vcp-drivers
+
+
+HauntCue by Rick Scarlett — free for fellow fiends.
+Feature requests and bug reports: rick.scarlett@gmail.com
+Donations are optional: donate whatever you can afford to help keep it free.
+Cash App: $rickscarlett · https://cash.app/$rickscarlett
+Shareable feature page: SHOWCASE.html (Print / save as PDF).
+
+New C3/S2/S3/C6 builds are experimental, compiled but not hardware tested. Read MULTI-BOARD-INSTALL.md for channel limits and default pins.

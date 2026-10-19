@@ -1,0 +1,66 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HauntCue easy install</title><style>body{font:17px/1.6 system-ui;background:#10170f;color:#edf4e7;max-width:850px;margin:25px auto;padding:0 20px}h1{color:#b5f447}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#ffaf59}
+/* Blood accents stay outside control hit areas. */
+.panel,.quick-card{padding-top:34px!important}
+body{background-color:#0b080c;background-image:radial-gradient(ellipse at 10% 0%,#54101c35,transparent 50%),radial-gradient(ellipse at 95% 25%,#bd4c1618,transparent 45%)}
+.haunted-frieze{max-width:1000px;margin:0 auto 18px;pointer-events:none;opacity:.9}.haunted-frieze svg{display:block;width:100%;height:auto;filter:drop-shadow(0 0 12px #db601222)}
+.panel,.quick-card{position:relative;border-color:#51313a;box-shadow:0 8px 24px #0005;background-image:linear-gradient(145deg,#39132118,transparent 60%)}
+.panel:before,.quick-card:before{content:"";position:absolute;top:0;left:16px;right:16px;height:28px;pointer-events:none;background:linear-gradient(90deg,#a8192e,#650c1e 45%,#b52437);filter:drop-shadow(0 2px 2px #260008);clip-path:polygon(0 0,100% 0,100% 12%,82% 12%,82% 58%,81% 76%,80% 58%,80% 12%,63% 12%,63% 32%,62% 47%,61% 32%,61% 12%,34% 12%,34% 76%,33% 100%,32% 76%,32% 12%,12% 12%,12% 40%,11% 60%,10% 40%,10% 12%,0 12%)}
+.tabs button.selected{box-shadow:inset 0 -2px #a52b38,0 0 12px #d9661715}
+.heading{border-color:#6b3540!important}.primary{box-shadow:0 0 14px #f0742418}.danger{background:linear-gradient(#5c2030,#30111c)!important}a{color:#f6ac66}
+@media(max-width:600px){.haunted-frieze{margin:0 -6px 14px}.panel h2:before{font-size:20px}.panel:before,.quick-card:before{height:23px}}
+@media print{.haunted-frieze,.panel:before,.quick-card:before{display:none}}
+</style><img src="web/hauntcue-logo.webp" alt="HauntCue logo" style="width:180px;max-width:100%;height:auto"><h1>HauntCue · start here</h1><p>Extract the entire ZIP, then double-click <strong>INSTALL-START-HERE.cmd</strong>.</p><pre>HauntCue - ESP32 Halloween prop controller
+
+EASY WINDOWS x64 INSTALL (no Arduino IDE or Python needed)
+1. Extract the WHOLE ZIP to a folder. Do not run the installer inside the ZIP.
+2. Plug in a supported ESP32 / C3 / S2 / S3 / C6 board with at least 4MB flash using a USB DATA cable.
+   Leave all prop loads unplugged. The installer detects the family. ESP8266/H2/P4/C5 are not included.
+3. Double-click INSTALL-START-HERE.cmd. Choose the ESP32&#x27;s COM port.
+   Unplug/replug to see which port disappears if there are multiple ports.
+4. Choose 1 to install/update and retain settings, or 2 for a fresh installation.
+   Fresh installation erases saved settings on that ESP32; it asks you to type ERASE.
+   Type INSTALL to begin. Wait for UPLOAD VERIFIED before unplugging.
+5. On your phone/PC, join Wi-Fi HauntCue-XXXXXX.
+   Fresh-board Wi-Fi password: hauntcue123
+6. Open http://192.168.4.1 (type it into the browser address bar).
+   Login: admin / hauntcue123 for a fresh installation.
+7. Follow the four-step setup wizard. Choose a controller name, prop/audio option,
+   and optional home Wi-Fi. Review your choices, confirm USB-only and finish.
+   You can reopen it under Features &amp; help &gt; Run setup wizard.
+8. Review Pins &amp; trigger and Sound before attaching prop hardware.
+   The default GPIO table is NOT a voltage/power driver. Use compatible drivers.
+   New and updated boards boot disarmed.
+
+IF THERE IS NO COM PORT:
+Use a data cable (some USB cables only charge). Install the USB serial driver
+from your ESP board/USB-chip manufacturer, then unplug/replug.
+Your USB chip may be CP210x, CH340, or another model; use its matching driver.
+
+IF THE UPLOAD CANNOT CONNECT:
+Close serial monitors. Hold the board&#x27;s BOOT button while connection dots appear;
+release once it connects. Try a shorter USB cable or another USB socket.
+
+A Windows download/security prompt may appear for the bundled executable/script.
+Use the official vendor/tool source and your normal Windows trust policy; this
+installer does not disable Defender, SmartScreen or change system execution policy.
+ExecutionPolicy Bypass applies only to this installer PowerShell process.
+
+AUDIO:
+Read DY-SV8F-AUDIO.md. Extract HauntCue-audio-starter.zip separately, or use
+files in audio-starter/. Copy only the WAV files to the DY USB drive, in order.
+Serial control does not transfer sound files. Change DIP switches with power off.
+
+The installer bundles Espressif esptool v5.3.1 plus its license and source archive.
+Source: https://github.com/espressif/esptool/tree/v5.3.1
+Firmware source, verification notes and wiring diagrams are included.
+
+Official CP210x driver page (for CP210x USB chips):
+https://www.silabs.com/software-and-tools/usb-to-uart-bridge-vcp-drivers
+</pre><p><a href="https://www.silabs.com/software-and-tools/usb-to-uart-bridge-vcp-drivers">Official CP210x driver page</a> · <a href="https://attach01.oss-us-west-1.aliyuncs.com/IC/Datasheet/13751.pdf">DY-SV8F module manual</a></p><h2>Free for fellow fiends</h2><p>HauntCue by Rick Scarlett is free to use. Feature requests and bug reports: <a href="mailto:rick.scarlett@gmail.com">rick.scarlett@gmail.com</a>.</p><p>Donations are optional. Donate whatever you can afford to help keep it free for fellow fiends. Cash App: <a href="https://cash.app/$rickscarlett">$rickscarlett</a>.</p><p><a href="SHOWCASE.html">Shareable showcase and features page</a></p></html>
+<p>After setup, use <strong>Device inventory</strong> for reusable hardware profiles and <strong>Props &amp; controllers</strong> for whole prop backups and fresh setup. <a href="PROPS-AND-DEVICES.md">Device and prop guide</a></p>
+<p><a href="MULTI-BOARD-INSTALL.md">Multi-board installation and channel limits</a>. New C3/S2/S3/C6 builds are experimental and compiled, with hardware testing still required.</p>
+<p>Once connected, use the prominent <strong>Setup wizard</strong> button. It walks through channels, sensors or timer triggering, lights, servo, sound and Wi-Fi, then shows your GPIO wiring and test shortcuts.</p>
+
+<section><h2>Optional red emergency-stop button</h2><p>The controller has a dedicated normally closed button input, independent of prop presets. Open Devices or the Physical button badge to configure it after wiring. <a href="PHYSICAL-STOP.md">Wiring and reset instructions</a>. Classic ESP32-WROOM default: NC → GPIO16, COM → GND. Internal pull-up; no external resistor. It stays disabled until enabled; releasing the button never re-arms the prop. Use appropriate independent hardware for a power cutoff.</p></section>
+
+<p><a href="TIMELINES.md">Scare and Ambient timeline help</a> · <a href="STATUS-LEDS.md">Optional independent three-pixel status strip</a></p>
