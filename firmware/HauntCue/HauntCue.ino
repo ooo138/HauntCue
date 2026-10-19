@@ -17,6 +17,8 @@
 
 #include "CueEngine.h"
 #include "PhysicalStop.h"
+#include "ArmInput.h"
+#include "ConfigValidation.h"
 
 #include "WebUI.h"
 
@@ -40,6 +42,10 @@ WebServer server(80);
 Preferences prefs;
 
 Config config;
+ArmInput armInput;
+int armInputPin=-1;
+volatile bool otaBusy=false;
+bool configLoadFault=false;
 
 Engine engine;
 
@@ -67,7 +73,7 @@ void servoTick(uint32_t now) {
 
   if (servoLive && uint32_t(now-servoLiveAt)>=2000) servoLive=false;
 
-  if (!config.servo || (!engine.armed && !servoLive)) { disableServo(); return; }
+  if (!config.servo || ((engine.running||engine.idle)&&!(config.scenes[engine.sceneIndex()].enabledMask&(1u<<6))) || (!engine.armed && !engine.running && !servoLive)) { disableServo(); return; }
 
   if (!servoAttached) {
 
@@ -108,7 +114,7 @@ struct EngineLock {
 
 };
 
-const char* buildVersion = "1.32.0";
+const char* buildVersion = "1.33.0";
 PhysicalStop physicalStop;
 int physicalStopPin=strcmp(BOARD_FAMILY,"esp32")==0?16:strcmp(BOARD_FAMILY,"esp32c3")==0?3:strcmp(BOARD_FAMILY,"esp32c6")==0?18:12;
 bool physicalStopConflict(const Config& c,int pin){
@@ -137,16 +143,17 @@ void audioTick(uint32_t now){if(uint32_t(now-audioBootAt)<2000)return;for(unsign
 uint32_t audioProgram=0;AudioCueClock audioClock;bool lastIdle=false,firstAudioTouched=false;
 void stopAudio(){lastIdle=false;firstAudioTouched=false;audioClock.reset();for(unsigned k=0;k<2;k++){clearAudio(k);queueAudio(0x19,1,k);queueAudio(0x16,0,k);}}
 void ambient(bool resume=false){if(config.audio2){clearAudio(1);if(!resume)clearAudio(0);}else clearAudio(0);if(!resume||!config.audio2)queueAudio(0x06,config.volume,0);queueAudio(0x06,config.volume2,1);routeAmbient(config.audio,config.audio2,config.ambientTrack,resume,[](unsigned k,uint8_t cmd,uint16_t v){queueAudio(cmd,v,k);});}
-void scare(){if(lastIdle){clearAudio(0);if(firstAudioTouched)ambient(false);}firstAudioTouched=false;audioProgram=engine.generation();audioClock.reset();clearAudio(config.audio2?1:0);queueAudio(0x06,config.audio2?config.volume2:config.volume,config.audio2?1:0);routeScare(config.audio,config.audio2,config.scenes[engine.sceneIndex()].scareTrack,[](unsigned k,uint8_t cmd,uint16_t v){queueAudio(cmd,v,k);});}
+void applyAudioMask(){const auto mask=config.scenes[engine.sceneIndex()].enabledMask;for(unsigned k=0;k<2;k++)if(!(mask&(1u<<(9+k))))clearAudio(k);muteScenePlayers(mask,[](unsigned k,uint8_t cmd,uint16_t v){queueAudio(cmd,v,k);});if(config.audio&&!(mask&(1u<<9)))firstAudioTouched=true;}
+void scare(){if(lastIdle){clearAudio(0);if(firstAudioTouched)ambient(false);}firstAudioTouched=false;audioProgram=engine.generation();audioClock.reset();clearAudio(config.audio2?1:0);queueAudio(0x06,config.audio2?config.volume2:config.volume,config.audio2?1:0);routeScare(config.audio,config.audio2,(config.scenes[engine.sceneIndex()].enabledMask&(1u<<(config.audio2?10:9)))?config.scenes[engine.sceneIndex()].scareTrack:0,[](unsigned k,uint8_t cmd,uint16_t v){queueAudio(cmd,v,k);});applyAudioMask();}
 
-void cueAudioTick(uint32_t now){if(!engine.running&&!engine.idle)return;if(audioProgram!=engine.generation()){audioProgram=engine.generation();audioClock.reset();}audioClock.tick(config.scenes[engine.sceneIndex()],engine.elapsed(now),[](const AudioCue& q){if(!audioEnabled(q.player))return true;if(audioRuntime[q.player].count+(q.action==0?2:1)>12)return false;if(q.player==0&&q.action!=1)firstAudioTouched=true;if(q.action==0){queueAudio(0x19,1,q.player);queueAudio(0x12,q.value,q.player);}else queueAudio(q.action==1?0x06:0x16,q.value,q.player);return true;});}
+void cueAudioTick(uint32_t now){if(!engine.running&&!engine.idle)return;if(audioProgram!=engine.generation()){audioProgram=engine.generation();audioClock.reset();applyAudioMask();}audioClock.tick(config.scenes[engine.sceneIndex()],engine.elapsed(now),[](const AudioCue& q){if(!audioEnabled(q.player)||!(config.scenes[engine.sceneIndex()].enabledMask&(1u<<(9+q.player))))return true;if(audioRuntime[q.player].count+(q.action==0?2:1)>12)return false;if(q.player==0&&q.action!=1)firstAudioTouched=true;if(q.action==0){queueAudio(0x19,1,q.player);queueAudio(0x12,q.value,q.player);}else queueAudio(q.action==1?0x06:0x16,q.value,q.player);return true;});}
 StormEngine stormEngines[2];
 uint32_t lightTestStart[2]={};bool lightTesting[2]={},lightTestEvent[2]={};
 
 struct StatusLEDSettings {bool enabled=false;int pin=strcmp(BOARD_FAMILY,"esp32")==0?17:strcmp(BOARD_FAMILY,"esp32c3")==0?5:strcmp(BOARD_FAMILY,"esp32c6")==0?19:13;uint8_t pixels=3,brightness=15;} statusLED;
 bool statusLEDAttached=false,statusLEDFault=false;uint32_t statusLEDLast=0xffffffffU;rmt_data_t statusLEDData[8*24+1];
 bool statusPinSupported(int p){return outputPin(p)||(strcmp(BOARD_FAMILY,"esp32")==0&&p==17);}
-bool statusLEDConflict(const Config& c,int p){return physicalStopConflict(c,p)||(physicalStop.enabled&&physicalStopPin==p);}
+bool statusLEDConflict(const Config& c,int p){return physicalStopConflict(c,p)||(physicalStop.enabled&&physicalStopPin==p)||(armInput.enabled&&armInputPin==p);}
 void releaseStatusLED(){if(statusLEDAttached){uint32_t start=millis();while(!rmtTransmitCompleted(statusLED.pin)&&uint32_t(millis()-start)<10)delay(1);for(unsigned i=0;i<statusLED.pixels*24;i++){statusLEDData[i].level0=1;statusLEDData[i].duration0=4;statusLEDData[i].level1=0;statusLEDData[i].duration1=8;}auto& reset=statusLEDData[statusLED.pixels*24];reset.level0=reset.level1=0;reset.duration0=reset.duration1=3000;rmtWrite(statusLED.pin,statusLEDData,statusLED.pixels*24+1,20);rmtDeinit(statusLED.pin);pinMode(statusLED.pin,INPUT);}statusLEDAttached=false;}
 void setupStatusLED(){statusLEDFault=false;statusLEDLast=0xffffffffU;if(!statusLED.enabled)return;if(statusLEDConflict(config,statusLED.pin)){statusLEDFault=true;return;}statusLEDAttached=rmtInit(statusLED.pin,RMT_TX_MODE,RMT_MEM_NUM_BLOCKS_1,10000000);statusLEDFault=!statusLEDAttached;}
 bool stormAttached[2]={},stormFaults[2]={};int stormLast[2]={-1,-1};
@@ -175,8 +182,9 @@ uint32_t statusLEDColor(){return physicalStop.blocked()||servoFault||stormFaults
 void statusLEDTick(){if(!statusLED.enabled||!statusLEDAttached||!rmtTransmitCompleted(statusLED.pin))return;uint32_t color=statusLEDColor();if(color==statusLEDLast)return;unsigned n=0;for(unsigned pixel=0;pixel<statusLED.pixels;pixel++)for(unsigned byte=0;byte<3;byte++){uint8_t value=stormByte(color,byte,statusLED.brightness);for(int bit=7;bit>=0;bit--){bool one=value&(1<<bit);auto& item=statusLEDData[n++];item.level0=1;item.duration0=one?8:4;item.level1=0;item.duration1=one?4:8;}}statusLEDData[n].level0=statusLEDData[n].level1=0;statusLEDData[n].duration0=statusLEDData[n].duration1=3000;if(rmtWriteAsync(statusLED.pin,statusLEDData,n+1))statusLEDLast=color;else statusLEDFault=true;}
 void lightingTick(uint32_t now){for(unsigned k=0;k<2;k++){const auto& st=stormConfig(k);if(!st.enabled||!stormAttached[k])continue;
 
- bool manual=!engine.armed&&lightTesting[k]&&uint32_t(now-lightTestStart[k])<3000;if(!manual)lightTesting[k]=false;
- if(!engine.armed&&!manual){if(!lightingDark[k]){if(!st.addressable||rmtTransmitCompleted(st.pin)){lightOff(k,false);lightingDark[k]=true;}}lightWasArmed[k]=false;stormEngines[k].reset();continue;}
+ bool sequence=engine.running||engine.idle;bool muted=sequence&&!(config.scenes[engine.sceneIndex()].enabledMask&(1u<<(7+k)));
+ bool manual=!engine.armed&&!sequence&&lightTesting[k]&&uint32_t(now-lightTestStart[k])<3000;if(!manual)lightTesting[k]=false;
+ if((!engine.armed&&!sequence&&!manual)||muted){if(!lightingDark[k]){if(!st.addressable||rmtTransmitCompleted(st.pin)){lightOff(k,false);lightingDark[k]=true;}}lightWasArmed[k]=false;stormEngines[k].reset();continue;}
 
  if(!lightWasArmed[k]){lightWasArmed[k]=true;lightStarted[k]=now;}
 
@@ -252,7 +260,7 @@ void setupPins() {
 
 void defaults() {
 
-  config = Config{};
+  resetConfig(config);
 
   const auto& pins=BOARD_PINS;
 
@@ -322,7 +330,7 @@ void encodeConfig(JsonDocument& doc, const Config& c) {
 
     const Scene& s = c.scenes[i]; JsonObject obj = scenes.add<JsonObject>();
 
-    obj["name"] = s.name; obj["duration"] = s.duration; obj["scareTrack"] = s.scareTrack;
+    obj["enabledMask"]=s.enabledMask;obj["name"] = s.name; obj["duration"] = s.duration; obj["scareTrack"] = s.scareTrack;
 
     JsonArray lights=obj["lightCues"].to<JsonArray>();for(unsigned j=0;j<s.lightCount;j++){auto o=lights.add<JsonObject>();o["channel"]=s.lightCues[j].channel;o["start"]=s.lightCues[j].start;o["duration"]=s.lightCues[j].duration;}
 
@@ -353,6 +361,7 @@ bool nameField(JsonVariantConst v, size_t max) { return v.is<const char*>() && s
 bool decodeProfile(JsonVariantConst o,LightProfile& p){if(!number(o["effect"],0,10)||!number(o["brightness"],0,100)||!number(o["speed"],100,10000)||!number(o["width"],1,20)||!number(o["color"],0,0xffffff)||!number(o["secondary"],0,0xffffff))return false;p.effect=o["effect"];p.brightness=o["brightness"];p.speed=o["speed"];p.width=o["width"];p.color=o["color"];p.secondary=o["secondary"];return true;}
 
 const char* decodeConfig(JsonVariantConst root, Config& c) {
+  if(const auto* error=validateConfigFields(root))return error;
 
   if (!root.is<JsonObjectConst>() || !number(root["schema"],1,1)) return "Unsupported cue-sheet format.";
 
@@ -370,7 +379,7 @@ const char* decodeConfig(JsonVariantConst root, Config& c) {
 
   if(!au["player"].isNull() && au["player"]!="dfplayer" && au["player"]!="dy")return "Unknown audio player.";
 
-  c = Config{}; c.outputCount = outs.size(); c.sceneCount = scenes.size(); c.selected = root["selected"]; c.storm.channel=min<uint8_t>(5,c.outputCount-1); c.storm2.channel=min<uint8_t>(4,c.outputCount-1);
+  resetConfig(c); c.outputCount = outs.size(); c.sceneCount = scenes.size(); c.selected = root["selected"]; c.storm.channel=min<uint8_t>(5,c.outputCount-1); c.storm2.channel=min<uint8_t>(4,c.outputCount-1);
 
   if (!root["storm"].isNull()) {
 
@@ -439,14 +448,14 @@ const char* decodeConfig(JsonVariantConst root, Config& c) {
     if (!nameField(s["name"],32) || !number(s["duration"],1,MAX_DURATION) || !number(s["scareTrack"],0,2999) || !cues || cues.size() > MAX_CUES) return "Invalid scene settings.";
 
     if(!s["randomServo"].isNull()&&!s["randomServo"].is<bool>())return "Invalid random servo setting.";
-    Scene& scene = c.scenes[i];scene.randomServo=s["randomServo"] | false; strlcpy(scene.name,s["name"],sizeof(scene.name)); scene.duration = s["duration"]; scene.scareTrack = s["scareTrack"]; scene.count = cues.size();
+    Scene& scene = c.scenes[i];scene.enabledMask=s["enabledMask"] | 2047;scene.randomServo=s["randomServo"] | false; strlcpy(scene.name,s["name"],sizeof(scene.name)); scene.duration = s["duration"]; scene.scareTrack = s["scareTrack"]; scene.count = cues.size();
 
     if(!s["audioCues"].isNull()){auto a=s["audioCues"].as<JsonArrayConst>();if(!a||a.size()>8)return "Invalid audio cues.";scene.audioCount=a.size();for(unsigned j=0;j<a.size();j++){auto q=a[j];if(!number(q["start"],0,MAX_DURATION)||!number(q["player"],0,1)||!number(q["action"],0,2)||!number(q["value"],0,2999))return "Invalid audio cue.";scene.audioCues[j]={q["start"].as<uint32_t>(),q["player"].as<uint8_t>(),q["action"].as<uint8_t>(),q["value"].as<uint16_t>()};}}
     if(!s["lightCues"].isNull()){auto lights=s["lightCues"].as<JsonArrayConst>();if(!lights||lights.size()>16)return "Invalid lighting cues.";scene.lightCount=lights.size();for(unsigned j=0;j<lights.size();j++){auto q=lights[j];if(!number(q["channel"],0,1)||!number(q["start"],0,MAX_DURATION)||!number(q["duration"],1,MAX_DURATION))return "Invalid lighting cue.";scene.lightCues[j]={q["channel"].as<uint8_t>(),q["start"].as<uint32_t>(),q["duration"].as<uint32_t>()};}}
 
     if (!s["servoMoves"].isNull()) {
 
-      auto moves=s["servoMoves"].as<JsonArrayConst>(); if (!moves || moves.size()>MAX_CUES) return "Invalid servo movements.";
+      auto moves=s["servoMoves"].as<JsonArrayConst>(); if (!moves || moves.size()>MAX_SERVO_MOVES) return "Invalid servo movements.";
 
       scene.servoCount=moves.size();
 
@@ -472,7 +481,7 @@ const char* decodeConfig(JsonVariantConst root, Config& c) {
 
 bool readConfig(const char* path, Config& out) {
 
-  File file = LittleFS.open(path,"r"); if (!file || file.size() > 20000) return false;
+  File file = LittleFS.open(path,"r"); if (!file || file.size() > MAX_CONFIG_BYTES) return false;
 
   JsonDocument doc; auto err = deserializeJson(doc,file); file.close();
 
@@ -509,11 +518,12 @@ bool persistConfig(const Config& next) {
 
 void jsonReply(const JsonDocument& doc) { String payload; serializeJson(doc,payload); server.send(200,"application/json",payload); }
 
-void errorReply(int code, const char* message) { JsonDocument doc; doc["error"] = message; String p; serializeJson(doc,p); server.send(code,"application/json",p); }
+void errorReply(int code, const char* message) { JsonDocument doc; doc["error"] = message;if(message==validationMessage&&validationPath[0])doc["field"]=validationPath; String p; serializeJson(doc,p); server.send(code,"application/json",p); }
 
-bool authorized() {
+bool authorized(bool multipart=false) {
+  if(server.method()==HTTP_POST&&otaBusy&&server.uri()!="/api/stop"&&server.uri()!="/api/update"){errorReply(409,"Firmware update in progress. Outputs remain disarmed.");return false;}
 
-  if (server.method()==HTTP_POST && !server.header("Content-Type").startsWith("application/json")) {
+  if (!multipart && server.method()==HTTP_POST && !server.header("Content-Type").startsWith("application/json")) {
 
     errorReply(415,"Use application/json for controller commands."); return false;
 
@@ -527,7 +537,7 @@ bool authorized() {
 
 bool stoppedForEdit() {
 
-  if (engine.armed || engine.running) { errorReply(409,"Disarm before saving or testing outputs."); return false; }
+  if (otaBusy || engine.armed || engine.running) { errorReply(409,"Disarm before saving or testing outputs."); return false; }
 
   return true;
 
@@ -543,10 +553,42 @@ void halt() {
 
 }
 
-bool physicalMotionAllowed(){samplePhysicalStop(millis());if(physicalStop.blocked()){halt();errorReply(409,"Physical stop latched. Release the button, reset the stop, then arm explicitly.");return false;}return true;}
+bool physicalMotionAllowed(){if(otaBusy||configLoadFault||!fsOK){errorReply(409,"Motion blocked: update or settings recovery is in progress. Saved settings have not been replaced.");return false;}samplePhysicalStop(millis());if(physicalStop.blocked()){halt();errorReply(409,"Physical stop latched. Release the button, reset the stop, then arm explicitly.");return false;}return true;}
 void physicalStopReply(){JsonDocument d;d["enabled"]=physicalStop.enabled;d["pin"]=physicalStopPin;d["latched"]=physicalStop.latched;d["open"]=physicalStop.open;d["ready"]=physicalStop.ready(millis());d["conflict"]=physicalStop.enabled&&physicalStopConflict(config,physicalStopPin);jsonReply(d);}
 void statusLEDReply(){JsonDocument d;d["enabled"]=statusLED.enabled;d["pin"]=statusLED.pin;d["pixels"]=statusLED.pixels;d["brightness"]=statusLED.brightness;d["fault"]=statusLEDFault;d["color"]=statusLEDColor();jsonReply(d);}
+bool armPinSupported(int pin){return (inputPin(pin)||(strcmp(BOARD_FAMILY,"esp32")==0&&pin==17))&&!boardNeedsExternalPull(pin);}
+bool armPinConflict(const Config& c,int pin){return physicalStopConflict(c,pin)||(physicalStop.enabled&&physicalStopPin==pin)||(statusLED.enabled&&statusLED.pin==pin);}
+void configureArmPin(){if(armInput.enabled&&!armPinConflict(config,armInputPin)){pinMode(armInputPin,INPUT_PULLUP);armInput.configure(true,armInput.toggle,millis(),digitalRead(armInputPin)==LOW);}}
+void sampleArmPin(uint32_t now){
+ if(!armInput.enabled)return;
+ if(armPinConflict(config,armInputPin)){halt();return;}
+ const int event=armInput.sample(digitalRead(armInputPin)==LOW,now);
+ if(event<0||(event>0&&armInput.toggle&&engine.armed)){halt();return;}
+ if(event>0&&!engine.armed&&!engine.running&&!otaBusy&&!configLoadFault&&fsOK&&!physicalStop.blocked()){
+  disableServo();engine.arm(true,now,digitalRead(config.triggerPin));writeOutputs(now);lastRun=false;ambient();
+ }
+}
+void armInputReply(){JsonDocument d;d["enabled"]=armInput.enabled;d["pin"]=armInputPin;d["toggle"]=armInput.toggle;d["pressed"]=armInput.active();auto pins=d["pins"].to<JsonArray>();for(int p=0;p<=48;p++)if(armPinSupported(p))pins.add(p);jsonReply(d);}
+#include "FirmwareUpdate.h"
 void initRoutes() {
+ installUpdateRoutes();
+ server.on("/api/arm-input",HTTP_GET,[]{if(authorized()){EngineLock lock;armInputReply();}});
+ server.on("/api/arm-input",HTTP_POST,[]{
+  if(!authorized())return;JsonDocument d;
+  if(server.arg("plain").length()>200||deserializeJson(d,server.arg("plain"))||!d["enabled"].is<bool>()||!d["toggle"].is<bool>()||!number(d["pin"],-1,48)||(d["enabled"].as<bool>()&&!armPinSupported(d["pin"]))){errorReply(400,"Arm input: select a supported GPIO with an internal pull-up and a button mode.");return;}
+  EngineLock lock;if(!stoppedForEdit())return;
+  if(d["enabled"].as<bool>()&&armPinConflict(config,d["pin"])){errorReply(409,"Arm input GPIO is already used by a prop, trigger, physical stop or status light. Free and save it first.");return;}
+  String payload;serializeJson(d,payload);
+  if(!nvsOK||prefs.putString("arm-input",payload)!=payload.length()){errorReply(507,"Arm input was not saved. Previous settings remain active.");return;}
+  halt();if(armInput.enabled)pinMode(armInputPin,INPUT);
+  armInputPin=d["pin"];armInput.configure(d["enabled"],d["toggle"],millis(),false);configureArmPin();armInputReply();
+ });
+ server.on("/api/sequence-test",HTTP_POST,[]{
+  if(!authorized())return;JsonDocument d;if(server.arg("plain").length()>100||deserializeJson(d,server.arg("plain"))||!number(d["scene"],0,config.sceneCount-1)){errorReply(400,"Choose an existing scene for a one-shot sequence test.");return;}
+  EngineLock lock;if(!stoppedForEdit()||!physicalMotionAllowed())return;
+  halt();if(!engine.preview(d["scene"],millis())){errorReply(409,"Wait for the current test to finish.");return;}
+  writeOutputs(millis());scare();lastRun=true;server.send(200,"application/json","{\"ok\":true}");
+ });
  server.on("/api/status-led",HTTP_GET,[]{if(!authorized())return;EngineLock lock;statusLEDReply();});
  server.on("/api/status-led",HTTP_POST,[]{if(!authorized())return;JsonDocument d;if(server.arg("plain").length()>200||deserializeJson(d,server.arg("plain"))||!d["enabled"].is<bool>()||!number(d["pin"],0,48)||!statusPinSupported(d["pin"])||!number(d["pixels"],1,8)||!number(d["brightness"],1,100)){errorReply(400,"Check status LED GPIO, 1–8 pixels and brightness 1–100%.");return;}EngineLock lock;if(!stoppedForEdit())return;if(d["enabled"].as<bool>()&&statusLEDConflict(config,d["pin"])){errorReply(409,"Status LEDs need a free GPIO, separate from prop devices and the stop button.");return;}auto previous=statusLED;releaseStatusLED();statusLED.enabled=d["enabled"];statusLED.pin=d["pin"];statusLED.pixels=d["pixels"];statusLED.brightness=d["brightness"];setupStatusLED();if(statusLEDFault){releaseStatusLED();statusLED=previous;setupStatusLED();errorReply(409,"No LED driver resource available. Prop lighting retains priority; disable an addressable prop channel or this status strip.");return;}String payload;serializeJson(d,payload);if(!nvsOK||prefs.putString("status-led",payload)!=payload.length()){releaseStatusLED();statusLED=previous;setupStatusLED();errorReply(507,"Status LED settings were not saved.");return;}statusLEDTick();statusLEDReply();});
 
@@ -555,7 +597,7 @@ void initRoutes() {
   if(!authorized())return;JsonDocument d;
   if(server.arg("plain").length()>200||deserializeJson(d,server.arg("plain"))||!d["enabled"].is<bool>()||!number(d["pin"],0,48)||!inputPin(d["pin"])){errorReply(400,"Choose a supported emergency-stop input pin.");return;}
   EngineLock lock;if(!stoppedForEdit())return;const bool enabled=d["enabled"];const int pin=d["pin"];
-  if(enabled&&(physicalStopConflict(config,pin)||(statusLED.enabled&&statusLED.pin==pin))){errorReply(409,"That pin belongs to a prop device. Free it before enabling the physical stop.");return;}
+  if(enabled&&(physicalStopConflict(config,pin)||(statusLED.enabled&&statusLED.pin==pin)||(armInput.enabled&&armInputPin==pin))){errorReply(409,"That pin belongs to a prop device. Free it before enabling the physical stop.");return;}
   if(physicalStop.enabled&&!enabled&&d["confirmDisable"]!=true){errorReply(400,"Confirm disabling physical stop protection with prop power disconnected.");return;}
   if(!nvsOK){errorReply(507,"Controller safety settings storage unavailable.");return;}
   JsonDocument stored;stored["enabled"]=enabled;stored["pin"]=pin;String payload;serializeJson(stored,payload);
@@ -580,7 +622,7 @@ void initRoutes() {
 
 
 
-  server.on("/api/capabilities",HTTP_GET,[]{if(!authorized())return;JsonDocument d;d["family"]=BOARD_FAMILY;d["maxOutputs"]=BOARD_OUTPUTS;d["audioPlayers"]=BOARD_AUDIO;d["trigger"]=BOARD_TRIGGER;d["servo"]=BOARD_SERVO;d["light1"]=BOARD_LIGHT1;d["light2"]=BOARD_LIGHT2;d["tx"]=BOARD_TX;d["rx"]=BOARD_RX;d["tx2"]=BOARD_TX2;d["rx2"]=BOARD_RX2;auto o=d["outputs"].to<JsonArray>();for(int p:BOARD_PINS)o.add(p);auto op=d["outputPins"].to<JsonArray>();auto ip=d["inputPins"].to<JsonArray>();for(int p=0;p<=48;p++){if(outputPin(p))op.add(p);if(inputPin(p))ip.add(p);}jsonReply(d);});
+  server.on("/api/capabilities",HTTP_GET,[]{if(!authorized())return;JsonDocument d;d["family"]=BOARD_FAMILY;d["maxCues"]=MAX_CUES;d["maxConfigBytes"]=MAX_CONFIG_BYTES;d["maxOutputs"]=BOARD_OUTPUTS;d["audioPlayers"]=BOARD_AUDIO;d["trigger"]=BOARD_TRIGGER;d["servo"]=BOARD_SERVO;d["light1"]=BOARD_LIGHT1;d["light2"]=BOARD_LIGHT2;d["tx"]=BOARD_TX;d["rx"]=BOARD_RX;d["tx2"]=BOARD_TX2;d["rx2"]=BOARD_RX2;auto o=d["outputs"].to<JsonArray>();for(int p:BOARD_PINS)o.add(p);auto op=d["outputPins"].to<JsonArray>();auto ip=d["inputPins"].to<JsonArray>();for(int p=0;p<=48;p++){if(outputPin(p))op.add(p);if(inputPin(p))ip.add(p);}jsonReply(d);});
   server.on("/api/library",HTTP_GET,[]{if(!authorized())return;if(!fsOK||!LittleFS.exists("/library.json")){server.send(200,"application/json","{}");return;}File f=LittleFS.open("/library.json","r");if(!f){errorReply(500,"Inventory read failed.");return;}server.streamFile(f,"application/json");f.close();});
   server.on("/api/library",HTTP_POST,[]{if(!authorized())return;{EngineLock lock;if(!stoppedForEdit())return;}if(!fsOK){errorReply(507,"Filesystem unavailable.");return;}const String payload=server.arg("plain");JsonDocument d;if(payload.length()>32000||deserializeJson(d,payload)||d["schema"]!=1||!d["devices"].is<JsonArray>()||d["devices"].size()>32||!d["assignments"].is<JsonObject>()||!d["activeProp"].is<const char*>()||strlen(d["activeProp"].as<const char*>())>160){errorReply(400,"Invalid inventory or size limit.");return;}for(JsonObjectConst p:d["devices"].as<JsonArrayConst>()){if(p["schema"]!=1||!nameField(p["id"],64)||!nameField(p["name"],24)||!nameField(p["type"],32)||!p["settings"].is<JsonObjectConst>()){errorReply(400,"Invalid device profile.");return;}}File f=LittleFS.open("/library.tmp","w");if(!f){errorReply(507,"Inventory save failed.");return;}size_t n=f.print(payload);f.flush();f.close();if(n!=payload.length()){LittleFS.remove("/library.tmp");errorReply(507,"Incomplete inventory save.");return;}if(!LittleFS.rename("/library.tmp","/library.json")){errorReply(507,"Inventory replace failed.");return;}server.send(200,"application/json","{\"ok\":true}");});
   server.on("/api/stage",HTTP_GET,[] {
@@ -702,7 +744,7 @@ void initRoutes() {
 
     { EngineLock lock; if (!stoppedForEdit()) return; halt(); }
 
-    if (server.arg("plain").length() > 20000) { errorReply(413,"Cue sheet is too large."); return; }
+    if (server.arg("plain").length() > MAX_CONFIG_BYTES) { errorReply(413,"Cue sheet exceeds the 65536-byte settings limit. Export the draft and reduce it before saving."); return; }
 
     JsonDocument doc; if (deserializeJson(doc,server.arg("plain"))) { errorReply(400,"Invalid JSON."); return; }
 
@@ -714,6 +756,7 @@ void initRoutes() {
  const char* error = decodeConfig(doc.as<JsonVariantConst>(),next);
 
     if (error) { errorReply(400,error); return; }
+    if(armInput.enabled&&armPinConflict(next,armInputPin)){errorReply(409,"Arm input GPIO is reserved on this controller. Choose another prop GPIO.");return;}
     if(statusLED.enabled&&statusLEDConflict(next,statusLED.pin)){errorReply(409,"Status LED GPIO is reserved on this controller.");return;}
     if(physicalStop.enabled&&physicalStopConflict(next,physicalStopPin)){errorReply(409,"Emergency-stop pin is reserved on this controller. Choose another prop GPIO.");return;}
 
@@ -725,7 +768,7 @@ void initRoutes() {
 
       for(unsigned k=0;k<2;k++)if(audioEnabled(k)&&audioRuntime[k].ready)sendAudio(0x16,0,k);
 
-      releasePins(); config = next; setupPins(); configurePhysicalStopPin();samplePhysicalStop(millis());if(physicalStop.blocked())halt();
+      releasePins(); config = next; setupPins(); configLoadFault=false;configureArmPin();configurePhysicalStopPin();samplePhysicalStop(millis());if(physicalStop.blocked())halt();
 
     }
 
@@ -743,6 +786,7 @@ void initRoutes() {
 
     samplePhysicalStop(now);doc["physicalStopEnabled"]=physicalStop.enabled;doc["physicalStopPin"]=physicalStopPin;doc["physicalStopLatched"]=physicalStop.latched;doc["physicalStopOpen"]=physicalStop.open;doc["physicalStopReady"]=physicalStop.ready(now);
     doc["statusLEDEnabled"]=statusLED.enabled;doc["statusLEDPin"]=statusLED.pin;doc["statusLEDPixels"]=statusLED.pixels;doc["statusLEDBrightness"]=statusLED.brightness;doc["statusLEDFault"]=statusLEDFault;doc["statusLEDColor"]=statusLEDColor();
+    doc["armInputEnabled"]=armInput.enabled;doc["armInputPin"]=armInputPin;doc["sequenceTest"]=engine.previewing;doc["updating"]=otaBusy;doc["configRecovery"]=configLoadFault;doc["freeHeap"]=ESP.getFreeHeap();
     doc["setupComplete"]=prefs.getBool("setup",prefs.isKey("network")); doc["armed"] = engine.armed; doc["running"] = engine.running;doc["idle"]=engine.idle;doc["scene"]=engine.sceneIndex(); doc["elapsed"] = engine.elapsed(now);
 
     doc["cooldown"] = engine.cooldownRemaining(now); doc["trigger"] = engine.triggerActive(); doc["runs"] = engine.runCount;
@@ -844,7 +888,16 @@ void setup() {
 
   // First boot initializes the flash filesystem. Config always starts disarmed.
 
-  fsOK = LittleFS.begin(true);
+  fsOK = LittleFS.begin(false);
+  if(!fsOK){
+    const auto* partition=esp_partition_find_first(ESP_PARTITION_TYPE_DATA,ESP_PARTITION_SUBTYPE_ANY,"spiffs");
+    bool erased=partition;uint8_t buffer[256];
+    for(size_t at=0;erased&&at<partition->size;at+=sizeof(buffer)){
+      if(esp_partition_read(partition,at,buffer,sizeof(buffer))!=ESP_OK){erased=false;break;}
+      for(auto byte:buffer)if(byte!=0xff){erased=false;break;}
+    }
+    if(erased&&LittleFS.format())fsOK=LittleFS.begin(false);
+  }
 
   if (fsOK) {
 
@@ -856,6 +909,7 @@ void setup() {
 
 
     if (readConfig("/config.json",saved) || readConfig("/config.bak",saved)) config=saved;
+    else if(LittleFS.exists("/config.json")||LittleFS.exists("/config.bak"))configLoadFault=true;
 
   }
 
@@ -878,6 +932,7 @@ void setup() {
 
 
 
+  if(prefs.isKey("arm-input")){JsonDocument arm;if(!deserializeJson(arm,prefs.getString("arm-input","{}"))&&arm["enabled"].is<bool>()&&arm["toggle"].is<bool>()&&number(arm["pin"],-1,48)&&(!arm["enabled"].as<bool>()||armPinSupported(arm["pin"]))){armInputPin=arm["pin"];armInput.configure(arm["enabled"],arm["toggle"],millis(),false);configureArmPin();}}
   adminPassword="hauntcue123";
 
   if (nvsOK) {
@@ -914,7 +969,7 @@ void setup() {
 
   if (discoveryReady) { MDNS.addService("http","tcp",80);MDNS.addService("hauntcue","tcp",80);MDNS.addServiceTxt("hauntcue","tcp","name",deviceName);MDNS.addServiceTxt("hauntcue","tcp","version",buildVersion); }
 
-  const char* headers[]={"Content-Type"}; server.collectHeaders(headers,1);
+  const char* headers[]={"Content-Type","X-HauntCue-SHA256","X-HauntCue-Size","X-HauntCue-Target"}; server.collectHeaders(headers,4);
 
   initRoutes(); server.begin();
 
@@ -924,8 +979,8 @@ void setup() {
 
       { EngineLock lock;
 
-        uint32_t now=millis();samplePhysicalStop(now);
-        if(!physicalStop.blocked()){engine.tick(now,digitalRead(config.triggerPin),esp_random());writeOutputs(now);servoTick(now);}
+        uint32_t now=millis();samplePhysicalStop(now);sampleArmPin(now);
+        if(!physicalStop.blocked()&&!otaBusy&&!configLoadFault){engine.tick(now,digitalRead(config.triggerPin),esp_random());writeOutputs(now);servoTick(now);}
 
         if (!physicalStop.blocked()&&(engine.running!=lastRun || (engine.running&&audioProgram!=engine.generation()))) { if (engine.running) scare(); else if (engine.armed){ambient(!firstAudioTouched);firstAudioTouched=false;} else stopAudio(); lastRun=engine.running; }
         if(!physicalStop.blocked()&&lastIdle&&!engine.idle&&!engine.running&&engine.armed){ambient(!firstAudioTouched);firstAudioTouched=false;}lastIdle=engine.idle;if(!physicalStop.blocked())cueAudioTick(now);
@@ -955,6 +1010,7 @@ void loop() {
   // Cue scheduling runs in its own task, independent of socket reads.
 
   server.handleClient();
+  if(otaBusy&&!otaComplete&&uint32_t(millis()-otaActivity)>15000)abortFirmwareUpdate("Firmware upload timed out. Existing firmware and settings remain intact.");
 
   if (rebootPending && uint32_t(millis()-rebootAt)>=1000) { { EngineLock lock; halt(); } ESP.restart(); }
 

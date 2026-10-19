@@ -12,5 +12,5 @@ vm.runInContext('cfg=normalize(clone(defaults));physicalStopSettings.enabled=fal
 const ino=fs.readFileSync(__dirname+'/../firmware/HauntCue/HauntCue.ino','utf8');
 for(const path of ['arm','fire','test','servo','light-test']){const start=ino.indexOf('server.on("/api/'+path+'"');assert(start>=0);const end=ino.indexOf('server.on(',start+10);assert.match(ino.slice(start,end<0?undefined:end),/physicalMotionAllowed\(\)/,path);}
 assert.match(ino,/prefs\.putString\("physical-stop"/);assert.match(ino,/physicalStop\.reset\(millis\(\)\).*halt\(\)/);
-assert.match(ino,/if\(!physicalStop\.blocked\(\)\)\{engine\.tick/);
+assert.match(ino,/if\(!physicalStop\.blocked\(\)&&!otaBusy&&!configLoadFault\)\{engine\.tick/);
 console.log('PASS: latched/open stop blocks movement, reserved trigger/audio pin validation, disabled legacy compatibility, all hardware movement endpoints guarded, independent persistence, reset disarms, engine gate');
